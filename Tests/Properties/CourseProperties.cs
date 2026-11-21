@@ -50,39 +50,74 @@ namespace Online_Course_Enrollment_System_Properties.Tests.Properties
                 var actual=course.Students.Count<=course.Capacity;
 
                 actual.Should().BeTrue();
+                course.FreeSeats.Should().Be(course.Capacity - course.Students.Count);
+                course.Students.Select(s => s.Id).Should().OnlyHaveUniqueItems();
             }
         }
 
         //P3. Ідемпотентність 
         [Property(Arbitrary =new[]{typeof(CourseArbitraries)})]
-        public void P3_EnrollSameStudentTwice_DoesNotChangeCourse(Course course, Student student)
+        public void P3_EnrollSameStudentTwice_DoesNotChangeCourse(Course course, Student[] students, Student student)
         {
-            course.Enroll(student);
+            foreach(var s in students)
+            {
+                if (course.FreeSeats > 1)
+                {
+                    course.Enroll(s);
+                }
+            }
+            
+            var newStudent=new Student(student.Id);
+            course.Enroll(newStudent);
+
             var studentsCountAfterFirst=course.Students.Count;
 
-            var secondAttempt=course.Enroll(new Student(student.Id));
+            var secondAttempt=course.Enroll(new Student(newStudent.Id));
 
             secondAttempt.Should().BeFalse();
             course.Students.Count.Should().Be(studentsCountAfterFirst);
+            course.FreeSeats.Should().Be(course.Capacity - course.Students.Count);
         }
 
         //P8. Без винятку
         [Property(Arbitrary =new[]{typeof(CourseArbitraries)})]
-        public void P8_NoException_Enroll_ValidStudent(Course course, Student student)
+        public void P8_NoException_Enroll_ValidStudent(Course course, Student[] students, Student student)
         {
-            Action act = () => course.Enroll(student);
+            foreach (var s in students)
+            {
+                if (course.FreeSeats > 1)
+                {
+                    course.Enroll(s);
+                }
+            }
+             
+            var newStudent = new Student(student.Id);
+
+            Action act = () => course.Enroll(newStudent);
+
             act.Should().NotThrow();
+            course.IsEnrolled(newStudent.Id).Should().BeTrue();
         }
 
         // P8. Без винятку
         [Property(Arbitrary = new[] { typeof(CourseArbitraries) })]
-        public void P8_NoException_Unenroll_EnrolledStudent(Course course, Student student)
+        public void P8_NoException_Unenroll_EnrolledStudent(Course course, Student[] students, Student student)
         {
-            course.Enroll(student);
+            foreach (var s in students)
+            {
+                if (course.FreeSeats > 1)
+                {
+                    course.Enroll(s);
+                }
+            }
 
-            Action act = () => course.Unenroll(student.Id);
+            var newStudent=new Student(student.Id);
+            course.Enroll(newStudent);
+
+            Action act = () => course.Unenroll(newStudent.Id);
 
             act.Should().NotThrow();
+            course.IsEnrolled(newStudent.Id).Should().BeFalse();
         }
 
         //Тест з передумовою When
@@ -110,14 +145,30 @@ namespace Online_Course_Enrollment_System_Properties.Tests.Properties
             return ok.When(applicable);
         }
 
-        //Тест виняток
+        //Тест виняток з передумовою
         [Property(Arbitrary = new[] { typeof(CourseArbitraries) })]
-        public void Unenroll_StudentNotEnrolled_ThrowsException(Course course, Student student)
+        public Property Unenroll_StudentNotEnrolled_ThrowsException(Course course, Student[] students, Student student)
         {
-            Action act = () => course.Unenroll(student.Id);
+            foreach(var s in students)
+            {
+                if (course.FreeSeats > 1)
+                {
+                    course.Enroll(s);
+                }
+            }
 
-            act.Should().Throw<InvalidOperationException>();
+            bool applicable = !course.IsEnrolled(student.Id);
+            bool ok = true;
+
+            if (applicable)
+            {
+                Action act = () => course.Unenroll(student.Id);
+
+                act.Should().Throw<InvalidOperationException>();
+            }
+
+            return ok.When(applicable);
         }
-
+        
     }
 }
